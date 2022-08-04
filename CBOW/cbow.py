@@ -5,7 +5,7 @@ import numpy as np
 from datasets import ptb
 import dezero.layers as L
 import dezero.functions as F
-from dezero.optimizers import Adam
+from dezero.optimizers import Adam, SGD
 from dezero import Variable, Model
 from dezero import DataLoader
 import matplotlib.pyplot as plt
@@ -16,8 +16,8 @@ import dezero
 
 window_size = 5
 hidden_size = 100
-batch_size = 3
-max_eopch = 10
+batch_size = 100
+max_eopch = 30
 eps = 1e-8
 
 
@@ -45,16 +45,16 @@ model = CBOW(vocab_size, hidden_size)
 optimizer = Adam().setup(model)
 sampler = UnigramSampler(corpus)
 
-if os.path.exists('ptb_cbow.npz'):
-    model.load_weights('ptb_cbow.npz')
+if os.path.exists(os.path.join(os.path.dirname(__file__), 'ptb_cbow.npz')):
+    model.load_weights(os.path.join(os.path.dirname(__file__), 'ptb_cbow.npz'))
 
-if dezero.cuda.gpu_enable():
-    trainloader.to_gpu()
-    model.to_gpu()
 
 info = {}
+best_loss = 250
+
 info['train_loss'] = []
 for epoch in tqdm(range(max_eopch)):
+    loss_sum = []
     for x, y in tqdm(trainloader, total=trainloader.data_size / trainloader.batch_size, leave=False):
         loss = 0
 
@@ -76,6 +76,12 @@ for epoch in tqdm(range(max_eopch)):
         loss.backward()
         optimizer.update()
         info['train_loss'] += [loss.data]
+        loss_sum += [loss.data]
+    loss_mean = np.array(loss_sum).mean()
+    print(" ======= train loss: {} ======".format(loss_mean))
+    if loss_mean < best_loss:
+        best_loss = loss_mean
+        model.save_weights(os.path.dirname(__file__) + '/ptb_cbow.npz')
 
-model.save_weights(os.path.dirname(__file__) + '/ptb_cbow.npz')
+
 plt.plot(info['train_loss'])
